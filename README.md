@@ -18,6 +18,9 @@ Unlike standard search agents, ResearchOrchestra doesn't just find data—it **s
 ### 3. Persistent Contextual Memory
 Powered by **PostgreSQL**, the system maintains long-term memory of user goals, previous research, and session context, allowing for fluid multi-turn intelligence gathering.
 
+### 4. Secure Authentication
+Integrated with **Firebase** to provide robust user management, supporting both **Email/Password** and **Google Sign-In** for a seamless onboarding experience.
+
 ---
 
 ## 🏗️ Technical Architecture
@@ -52,6 +55,7 @@ The project follows a **Supervisor-Worker** pattern using LangGraph:
 - **Frameworks**: LangChain, LangGraph, FastAPI, Next.js 14 (App Router)
 - **AI Models**: Groq (Llama-3), Tavily (Search)
 - **Database**: PostgreSQL (pgvector ready)
+- **Authentication**: Firebase (Email & Google Sign-In)
 - **Styling**: Tailwind CSS, Framer Motion, Lucide Icons
 
 ---

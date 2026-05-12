@@ -40,7 +40,7 @@ The project follows a **Supervisor-Worker** pattern using LangGraph:
 
 ### Chat Interface
 ![Chat Interface](screenshots/chat_interface.png) 
-*(The chat interface features a premium, dark-mode UI.*
+*The chat interface features a premium, dark-mode UI.*
 
 ### Research Pipeline Visualization
 ![Orchestrator Graph](backend/graph_orchestrator_graph.png)

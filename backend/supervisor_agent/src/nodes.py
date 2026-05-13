@@ -182,6 +182,7 @@ async def quick_search_node(state: SupervisorState):
     return {
         "subgraph_output": response.content + sources_txt,
         "search_results":  results,
+        "messages":        [AIMessage(content=response.content + sources_txt)],
     }
 
 
@@ -205,7 +206,10 @@ async def chat_node(state: SupervisorState):
     )
 
     response = await llm.ainvoke([HumanMessage(content=prompt)])
-    return {"subgraph_output": response.content}
+    return {
+        "subgraph_output": response.content,
+        "messages":        [AIMessage(content=response.content)],
+    }
 
 
 # ─────────────────────────────────────────────────────────────────────────────

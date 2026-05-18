@@ -1,5 +1,8 @@
 import os
 import sys
+from dotenv import load_dotenv
+
+load_dotenv()
 
 try:
     from IPython.display import Image, display
@@ -13,8 +16,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.append(PROJECT_ROOT)
 
 try:
-    from supervisor_agent.src.agent import graph as supervisor_graph
-    from agents.research_pipeline import graph as research_pipeline_graph
+    from agents.graph import supervisor_graph
+    from agents.graph import research_graph as research_pipeline_graph
 except ImportError as e:
     print(f"Error importing graphs: {e}")
     sys.exit(1)

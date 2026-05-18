@@ -1,3 +1,57 @@
+"""
+LangChain tools for ResearchOrchestra.
+Shared by all four sub-agents; each agent applies them with its own domain intent.
+"""
+
+from __future__ import annotations
+
+import logging
+from typing import Annotated
+
+from langchain_core.tools import tool
+
+from core.client import TavilySearchClient
+
+logger = logging.getLogger(__name__)
+
+
+@tool
+async def web_search(
+    query: Annotated[str, "Search query — be specific and include relevant context."],
+    max_results: Annotated[int, "Number of results to retrieve (1–10)."] = 5,
+) -> str:
+    """
+    Search the live web for current information using Tavily.
+
+    Use this tool whenever you need:
+    - Up-to-date facts, statistics, or news
+    - Information about specific companies, roles, or academic topics
+    - Current salary data, hiring trends, or market intelligence
+    - Recent research papers, courses, or resources
+
+    Returns formatted search results with titles, source URLs, and content snippets.
+    """
+    client = TavilySearchClient()
+    results = await client.search(query, max_results=max(1, min(max_results, 10)))
+
+    if not results:
+        return (
+            f"No results found for: '{query}'. "
+            "Try a more specific query or different keywords."
+        )
+
+    lines = [f"**Search results for:** {query}\n"]
+    for i, r in enumerate(results, 1):
+        preview = r["content"][:500].rstrip()
+        lines.append(
+            f"[{i}] **{r['title']}**\n"
+            f"    Source: {r['url']}\n"
+            f"    {preview}\n"
+        )
+    return "\n".join(lines)
+
+
+ALL_TOOLS = [web_search]
 import re
 from typing import List, Dict, Any
 
@@ -7,7 +61,7 @@ from readability import Document
 from tavily import TavilyClient
 from langchain_core.callbacks.manager import adispatch_custom_event
 
-from core.state import ResearchState
+from .state import ResearchState
 
 _tavily = TavilyClient()
 

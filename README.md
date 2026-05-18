@@ -41,11 +41,11 @@ A central LangGraph supervisor graph classifies intent using structured LLM outp
 ### Autonomous Research Pipeline
 Three specialized research modes, each with tailored query plans, synthesis prompts, and output formats:
 
-| Mode | Output | Scope |
-|---|---|---|
-| **Interview Intelligence** | 1,000–1,500+ line report | Interview questions, hiring process, culture, tech stack, salary, 3-day prep roadmap |
-| **Job Scenario Analysis** | 500+ line report | Hiring trends, skill demand, salary landscape, geographic hotspots, AI impact forecast |
-| **Academic Deep-Dive** | 300–500 line study guide | Core concepts, recent research (2024–2026), case studies, exam FAQ, cheat sheet |
+| Mode | Scope |
+|---|---|
+| **Interview Intelligence** | Interview questions, hiring process, culture, tech stack, salary, 3-day prep roadmap |
+| **Job Scenario Analysis** | Hiring trends, skill demand, salary landscape, geographic hotspots, AI impact forecast |
+| **Academic Deep-Dive** | Core concepts, recent research (2024–2026), case studies, exam FAQ, cheat sheet |
 
 ### Self-Reflective Coverage Check
 After fetching pages, a `reflect` node critiques coverage using structured LLM output (`ReflectResult`) and dispatches up to 3 supplementary search queries before synthesis — capped at one reflection pass to bound latency.

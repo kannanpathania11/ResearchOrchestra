@@ -274,6 +274,6 @@ pytest backend/tests/ -v
 
 
 ## Contact
-- 💼 [LinkedIn](www.linkedin.com/in/kannanpathania)
+- 💼 [LinkedIn](https://www.linkedin.com/in/kannanpathania)
 - ✉️ [Email](mailto:kannanpathania@gmail.com)
 

@@ -1,18 +1,23 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Send, 
-  User as UserIcon, 
-  Bot, 
-  Loader2, 
-  ChevronRight, 
+import {
+  Send,
+  User as UserIcon,
+  Bot,
+  Loader2,
+  ChevronRight,
   Settings,
   Sparkles,
   LogOut,
   Plus,
   MessageSquare,
-  Trash2
+  Trash2,
+  FlaskConical,
+  FileDown,
+  Copy,
+  Check,
+  Square,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import ReactMarkdown from "react-markdown";
@@ -32,6 +37,7 @@ type Message = {
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  isReport?: boolean;   // true when generated via Research Mode pipeline
 };
 
 type HistoryItem = {
@@ -53,8 +59,12 @@ export default function Dashboard() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [isHistoryLoading, setIsHistoryLoading] = useState(false);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [researchMode, setResearchMode] = useState(false);
+  const [researchPipelineMode, setResearchPipelineMode] = useState<"interview_intel" | "job_scenario" | "academic_help">("academic_help");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const scrollRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Auto-scroll to bottom when messages update
   useEffect(() => {
@@ -87,6 +97,7 @@ export default function Dashboard() {
     setMessages([]);
     setInput("");
     setCurrentStatus("");
+    setResearchMode(false);
   };
 
   const loadThread = async (id: string) => {
@@ -152,11 +163,14 @@ export default function Dashboard() {
 
     setMessages((prev) => [...prev, userMessage]);
     const sentInput = input;
+    const isReportRequest = researchMode; // capture at submit time
     setInput("");
     setIsTyping(true);
     setCurrentStatus("Initializing ResearchOrchestra...");
 
     try {
+      abortControllerRef.current = new AbortController();
+
       let currentThreadId = threadId;
       if (!currentThreadId) {
         currentThreadId = Date.now().toString();
@@ -166,10 +180,13 @@ export default function Dashboard() {
       const response = await fetch("http://localhost:8000/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: abortControllerRef.current.signal,
         body: JSON.stringify({
           message: sentInput,
           thread_id: currentThreadId,
           user_id: user?.uid || "anonymous",
+          research_pipeline_mode: researchMode,
+          research_mode: researchPipelineMode,
         }),
       });
 
@@ -194,11 +211,14 @@ export default function Dashboard() {
 
           // ── Stream finished ──────────────────────────────────────────────
           if (dataStr === "[DONE]") {
-            // Finalize the streaming message (remove isStreaming flag)
+            // A real report always streams tokens (streamingStarted=true).
+            // Clarification questions arrive as a single `final` event with no
+            // preceding tokens, so streamingStarted stays false — exclude them.
+            const finalId = Date.now().toString();
             setMessages((prev) =>
               prev.map((m) =>
                 m.id === STREAMING_MSG_ID
-                  ? { ...m, id: Date.now().toString(), isStreaming: false }
+                  ? { ...m, id: finalId, isStreaming: false, isReport: isReportRequest && streamingStarted }
                   : m
               )
             );
@@ -243,6 +263,8 @@ export default function Dashboard() {
 
             // ── Final (non-streaming) response ─────────────────────────────
             } else if (data.type === "final") {
+              // `final` fires when no streaming happened — always a clarification
+              // question or a non-streaming fallback, never a completed report.
               if (!streamingStarted) {
                 setMessages((prev) => [
                   ...prev,
@@ -250,6 +272,7 @@ export default function Dashboard() {
                     id: Date.now().toString(),
                     role: "assistant",
                     content: data.content,
+                    isReport: false,
                   },
                 ]);
               }
@@ -270,20 +293,104 @@ export default function Dashboard() {
           }
         }
       }
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: Date.now().toString(),
-          role: "assistant",
-          content: "Sorry, I encountered an error. Please ensure the backend is running.",
-        },
-      ]);
+    } catch (err: any) {
+      if (err.name === "AbortError") {
+        const finalId = Date.now().toString();
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === STREAMING_MSG_ID
+              ? { ...m, id: finalId, isStreaming: false, isReport: false }
+              : m
+          )
+        );
+      } else {
+        console.error(err);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: Date.now().toString(),
+            role: "assistant",
+            content: "Sorry, I encountered an error. Please ensure the backend is running.",
+          },
+        ]);
+      }
     } finally {
       setIsTyping(false);
       setCurrentStatus("");
       fetchHistory();
+    }
+  };
+
+  // ─── Report Actions ──────────────────────────────────────────────────────────
+
+  const downloadReport = async (messageId: string, topic: string) => {
+    const el = document.getElementById(`report-content-${messageId}`);
+    if (!el) return;
+
+    const date = new Date().toLocaleDateString("en-GB", {
+      day: "numeric", month: "long", year: "numeric",
+    });
+
+    const dateSlug = new Date().toISOString().slice(0, 10);
+    const topicSlug = topic.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+
+    // Strip Tailwind classes from the HTML so we don't rely on the external stylesheet
+    const cleanHtml = el.innerHTML.replace(/class="[^"]*"/g, "");
+
+    const wrapper = document.createElement("div");
+    wrapper.style.cssText = "font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Georgia,sans-serif;max-width:820px;margin:40px auto;padding:0 32px;color:#1a1a1a;line-height:1.75;background:#fff;font-size:15px;";
+    wrapper.innerHTML = `
+      <style>
+        h1 { font-size: 24px; font-weight: bold; margin-top: 24px; margin-bottom: 12px; border-bottom: 1px solid #e5e7eb; padding-bottom: 8px; color: #111827; }
+        h2 { font-size: 20px; font-weight: bold; margin-top: 24px; margin-bottom: 12px; color: #111827; }
+        h3 { font-size: 16px; font-weight: bold; margin-top: 16px; margin-bottom: 8px; color: #374151; }
+        p { margin: 12px 0; color: #374151; }
+        strong { font-weight: 600; color: #111827; }
+        em { font-style: italic; }
+        ul { margin: 12px 0 12px 24px; list-style-type: disc; }
+        ol { margin: 12px 0 12px 24px; list-style-type: decimal; }
+        li { margin-bottom: 6px; color: #374151; display: list-item; padding-left: 4px; }
+        pre { background: #f3f4f6; padding: 16px; border-radius: 8px; overflow-x: auto; font-family: monospace; font-size: 13px; margin: 16px 0; border: 1px solid #e5e7eb; }
+        code { font-family: monospace; font-size: 13px; color: #059669; }
+        p > code, li > code { background: #f3f4f6; padding: 2px 6px; border-radius: 4px; color: #2563eb; }
+        blockquote { border-left: 4px solid #3b82f6; padding-left: 16px; color: #4b5563; font-style: italic; margin: 16px 0; background: #eff6ff; padding: 12px 16px; border-radius: 0 8px 8px 0; }
+        hr { margin: 24px 0; border: none; border-top: 1px solid #e5e7eb; }
+        a { color: #3b82f6; text-decoration: underline; }
+      </style>
+      <div style="border-bottom:2px solid #e5e7eb;padding-bottom:16px;margin-bottom:32px;">
+        <div style="font-size:13px;font-weight:600;letter-spacing:0.1em;text-transform:uppercase;color:#6b7280;">ResearchOrchestra</div>
+        <div style="font-size:12px;color:#9ca3af;margin-top:4px;">Generated on ${date}</div>
+      </div>
+      ${cleanHtml}
+      <div style="margin-top:48px;padding-top:16px;border-top:1px solid #e5e7eb;font-size:12px;color:#9ca3af;">ResearchOrchestra · AI-powered multi-agent research</div>
+    `;
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const html2pdf = (await import("html2pdf.js")).default as any;
+    html2pdf()
+      .set({
+        margin: [12, 12, 12, 12],
+        filename: `${topicSlug}-${dateSlug}.pdf`,
+        image: { type: "jpeg", quality: 0.98 },
+        html2canvas: { 
+          scale: 2, 
+          useCORS: true,
+          // Prevent html2canvas from parsing Tailwind's v4 stylesheet which contains oklab colors
+          ignoreElements: (node: any) => node.nodeName === 'STYLE' || node.nodeName === 'LINK'
+        },
+        jsPDF: { unit: "mm", format: "a4", orientation: "portrait" },
+      })
+      .from(wrapper)
+      .save();
+  };
+
+  const copyMarkdown = async (content: string, messageId: string) => {
+    try {
+      await navigator.clipboard.writeText(content);
+      setCopiedId(messageId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } catch {
+      // clipboard API not available (rare)
     }
   };
 
@@ -354,7 +461,7 @@ export default function Dashboard() {
           <SidebarItem icon={<Settings size={18} />} label="Settings" />
           <div className="mt-4 bg-white/5 border border-white/10 rounded-xl p-3">
             <div className="flex items-center gap-3 mb-3">
-              <div className="w-8 h-8 bg-gradient-to-tr from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
+              <div className="w-8 h-8 bg-linear-to-tr from-purple-500 to-pink-500 rounded-full flex items-center justify-center shadow-lg">
                 <UserIcon size={16} className="text-white" />
               </div>
               <div className="flex flex-col overflow-hidden">
@@ -412,7 +519,7 @@ export default function Dashboard() {
           {/* Messages */}
           <div className="max-w-3xl mx-auto space-y-8">
           <AnimatePresence initial={false}>
-            {messages.map((m) => (
+            {messages.map((m, idx) => (
               <motion.div
                 key={m.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -443,7 +550,10 @@ export default function Dashboard() {
                     </div>
 
                     {/* Content */}
-                    <div className="ai-message-content pl-1 text-[15px] leading-7 text-white/88">
+                    <div
+                      id={`report-content-${m.id}`}
+                      className="ai-message-content pl-1 text-[15px] leading-7 text-white/88"
+                    >
                       <ReactMarkdown
                         components={{
                           h1: ({ children }) => (
@@ -465,16 +575,13 @@ export default function Dashboard() {
                             <em className="italic text-white/70">{children}</em>
                           ),
                           ul: ({ children }) => (
-                            <ul className="my-2 ml-4 space-y-1 list-none">{children}</ul>
+                            <ul className="my-2 ml-6 space-y-1 list-disc marker:text-blue-400">{children}</ul>
                           ),
                           ol: ({ children }) => (
-                            <ol className="my-2 ml-4 space-y-1 list-decimal list-inside">{children}</ol>
+                            <ol className="my-2 ml-6 space-y-1 list-decimal marker:text-blue-400">{children}</ol>
                           ),
                           li: ({ children }) => (
-                            <li className="flex gap-2 text-white/80 items-start">
-                              <span className="mt-2.5 w-1.5 h-1.5 rounded-full bg-blue-400/70 shrink-0" />
-                              <span>{children}</span>
-                            </li>
+                            <li className="text-white/80 pl-1">{children}</li>
                           ),
                           code: ({ inline, children }: any) =>
                             inline ? (
@@ -498,9 +605,38 @@ export default function Dashboard() {
 
                       {/* Blinking cursor while streaming */}
                       {m.isStreaming && (
-                        <span className="inline-block w-[2px] h-[1.1em] bg-blue-400 ml-0.5 animate-pulse align-middle rounded-full" />
+                        <span className="inline-block w-0.5 h-[1.1em] bg-blue-400 ml-0.5 animate-pulse align-middle rounded-full" />
                       )}
                     </div>
+
+                    {/* Report action toolbar — only for completed research mode reports */}
+                    {m.isReport && !m.isStreaming && (
+                      <div className="flex items-center gap-2 mt-4 pt-4 border-t border-white/5">
+                        <span className="text-[11px] text-purple-400/60 uppercase tracking-widest font-semibold mr-1">
+                          Research Report
+                        </span>
+                        <button
+                          onClick={() => {
+                            const topic = messages.slice(0, idx).reverse().find(msg => msg.role === "user")?.content ?? "research-report";
+                            downloadReport(m.id, topic);
+                          }}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-purple-600/15 border border-purple-500/25 text-purple-300 hover:bg-purple-600/25 transition-all"
+                        >
+                          <FileDown size={13} />
+                          Download PDF
+                        </button>
+                        <button
+                          onClick={() => copyMarkdown(m.content, m.id)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white/5 border border-white/10 text-white/50 hover:text-white/80 hover:bg-white/8 transition-all"
+                        >
+                          {copiedId === m.id ? (
+                            <><Check size={13} className="text-green-400" /><span className="text-green-400">Copied!</span></>
+                          ) : (
+                            <><Copy size={13} />Copy Markdown</>
+                          )}
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
               </motion.div>
@@ -531,26 +667,97 @@ export default function Dashboard() {
               id="chat-input"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder="Type your research request..."
+              placeholder={researchMode ? "Describe your research topic for a deep report..." : "Type your research request..."}
               disabled={isTyping}
-              className="w-full bg-white/5 border border-white/10 rounded-2xl py-4 pl-6 pr-14 focus:outline-none focus:border-blue-500/50 transition-all text-sm disabled:opacity-50"
-            />
-            <button
-              id="chat-submit-btn"
-              type="submit"
-              disabled={isTyping || !input.trim()}
-              className="absolute right-3 w-10 h-10 bg-blue-600 hover:bg-blue-500 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg shadow-blue-600/20"
-            >
-              {isTyping ? (
-                <Loader2 size={18} className="animate-spin" />
-              ) : (
-                <Send size={18} />
+              className={cn(
+                "w-full bg-white/5 border rounded-2xl py-4 pl-6 pr-14 focus:outline-none transition-all text-sm disabled:opacity-50",
+                researchMode
+                  ? "border-purple-500/30 focus:border-purple-500/60"
+                  : "border-white/10 focus:border-blue-500/50"
               )}
-            </button>
+            />
+            {isTyping ? (
+              <button
+                type="button"
+                onClick={() => abortControllerRef.current?.abort()}
+                className="absolute right-3 w-10 h-10 rounded-xl flex items-center justify-center transition-all bg-red-600 hover:bg-red-500 shadow-red-600/20 shadow-lg text-white"
+                title="Stop generating"
+              >
+                <Square size={16} fill="currentColor" />
+              </button>
+            ) : (
+              <button
+                id="chat-submit-btn"
+                type="submit"
+                disabled={!input.trim()}
+                className={cn(
+                  "absolute right-3 w-10 h-10 rounded-xl flex items-center justify-center transition-all disabled:opacity-40 disabled:cursor-not-allowed shadow-lg",
+                  researchMode
+                    ? "bg-purple-600 hover:bg-purple-500 shadow-purple-600/20"
+                    : "bg-blue-600 hover:bg-blue-500 shadow-blue-600/20"
+                )}
+              >
+                <Send size={18} />
+              </button>
+            )}
           </form>
-          <p className="text-[10px] text-white/20 text-center mt-3">
-            ResearchOrchestra uses multi-agent orchestration. Responses may take 1–2 minutes.
-          </p>
+
+          {/* Bottom bar: Research Mode toggle + disclaimer */}
+          <div className="max-w-3xl mx-auto mt-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => setResearchMode((m) => !m)}
+                disabled={isTyping}
+                className={cn(
+                  "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border",
+                  researchMode
+                    ? "bg-purple-600/20 border-purple-500/40 text-purple-300 hover:bg-purple-600/30"
+                    : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/8"
+                )}
+              >
+                <FlaskConical size={12} />
+                Research Mode
+                {researchMode && (
+                  <span className="ml-1 w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+                )}
+              </button>
+
+              <p className="text-[10px] text-white/20">
+                {researchMode
+                  ? "Deep research pipeline · structured report"
+                  : "Multi-agent · responses may take 1–2 min"}
+              </p>
+            </div>
+
+            {/* Mode pills — only visible when Research Mode is ON */}
+            {researchMode && (
+              <div className="flex items-center gap-2">
+                {(
+                  [
+                    { key: "academic_help",   label: "Academic"       },
+                    { key: "interview_intel", label: "Interview Prep" },
+                    { key: "job_scenario",    label: "Job Market"     },
+                  ] as const
+                ).map(({ key, label }) => (
+                  <button
+                    key={key}
+                    type="button"
+                    disabled={isTyping}
+                    onClick={() => setResearchPipelineMode(key)}
+                    className={cn(
+                      "px-3 py-1 rounded-full text-xs font-medium border transition-all",
+                      researchPipelineMode === key
+                        ? "bg-purple-600/30 border-purple-500/50 text-purple-200"
+                        : "bg-white/5 border-white/10 text-white/40 hover:text-white/70 hover:bg-white/8"
+                    )}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
         </div>
       </main>
     </div>

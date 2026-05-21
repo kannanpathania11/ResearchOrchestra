@@ -4,9 +4,21 @@
 
 ---
 
+## 🌐 Production Deployment
+
+ResearchOrchestra is deployed in a secure and multi-tier production environment designed for high-performance agent streaming and data persistence:
+
+* **Frontend Hosting**: Next.js deployed globally on **Vercel** (`https://research-orchestra.vercel.app`) with native, automated SSL.
+* **Backend Hosting**: FastAPI containerized and managed via **Docker Compose** on an **AWS EC2** instance (`t3.micro`) running Ubuntu 24.04 LTS.
+* **Reverse Proxy & SSL**: **Nginx** acting as a high-performance reverse proxy, fully secured with a globally trusted SSL certificate from **Certbot (Let's Encrypt)** (`https://research-orchestra-backend.duckdns.org`).
+* **Database Engine**: **AWS RDS (PostgreSQL 16)** handling persistent supervisor checkpointers and long-term memory.
+
+---
+
 ## Table of Contents
 
 - [Overview](#overview)
+- [Production Deployment](#production-deployment)
 - [Key Features](#key-features)
 - [Architecture](#architecture)
 - [Tech Stack](#tech-stack)

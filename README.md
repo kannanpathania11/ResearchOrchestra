@@ -9,7 +9,7 @@
 ResearchOrchestra is deployed in a secure and multi-tier production environment designed for high-performance agent streaming and data persistence:
 
 * **Frontend Hosting**: Next.js deployed globally on **Vercel** (`https://research-orchestra.vercel.app`) with native, automated SSL.
-* **Backend Hosting**: FastAPI containerized and managed via **Docker Compose** on an **AWS EC2** instance (`t3.micro`) running Ubuntu 24.04 LTS.
+* **Backend Hosting & Interactive API Docs**: FastAPI containerized and managed via **Docker Compose** on an **AWS EC2** instance (`t3.micro`) running Ubuntu 24.04 LTS. Live interactive **Swagger API Documentation** is accessible at [research-orchestra-backend.duckdns.org/docs](https://research-orchestra-backend.duckdns.org/docs)!
 * **Reverse Proxy & SSL**: **Nginx** acting as a high-performance reverse proxy, fully secured with a globally trusted SSL certificate from **Certbot (Let's Encrypt)** (`https://research-orchestra-backend.duckdns.org`).
 * **Database Engine**: **AWS RDS (PostgreSQL 16)** handling persistent supervisor checkpointers and long-term memory.
 

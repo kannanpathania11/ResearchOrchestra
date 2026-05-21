@@ -47,6 +47,7 @@ type HistoryItem = {
 
 // Stable streaming message ID — always the same so we can find & update it
 const STREAMING_MSG_ID = "assistant-streaming";
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 export default function Dashboard() {
   const { user } = useAuth();
@@ -79,7 +80,7 @@ export default function Dashboard() {
     if (!user?.uid) return;
     try {
       const res = await fetch(
-        `http://localhost:8000/chat/history?user_id=${encodeURIComponent(user.uid)}`
+        `${API_BASE_URL}/chat/history?user_id=${encodeURIComponent(user.uid)}`
       );
       const data = await res.json();
       setHistory(data.threads || []);
@@ -105,7 +106,7 @@ export default function Dashboard() {
     try {
       setIsHistoryLoading(true);
       const res = await fetch(
-        `http://localhost:8000/chat/history/${id}?user_id=${encodeURIComponent(user?.uid || "")}`
+        `${API_BASE_URL}/chat/history/${id}?user_id=${encodeURIComponent(user?.uid || "")}`
       );
       const data = await res.json();
       const loaded: Message[] = data.messages.map((m: any, idx: number) => ({
@@ -129,7 +130,7 @@ export default function Dashboard() {
     try {
       setDeletingId(id);
       await fetch(
-        `http://localhost:8000/chat/history/${id}?user_id=${encodeURIComponent(user?.uid || "")}`,
+        `${API_BASE_URL}/chat/history/${id}?user_id=${encodeURIComponent(user?.uid || "")}`,
         { method: "DELETE" }
       );
       // If we deleted the active thread, reset to new chat
@@ -177,7 +178,7 @@ export default function Dashboard() {
         setThreadId(currentThreadId);
       }
 
-      const response = await fetch("http://localhost:8000/chat", {
+      const response = await fetch(`${API_BASE_URL}/chat`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         signal: abortControllerRef.current.signal,

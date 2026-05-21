@@ -2,8 +2,9 @@ version: "3.9"
 
 services:
 
-  # ── PostgreSQL ──────────────────────────────────────────────────────────────
+  # ── PostgreSQL (local dev only — use RDS in production) ────────────────────
   db:
+    profiles: ["local"]
     image: postgres:16-alpine
     restart: unless-stopped
     environment:
@@ -25,21 +26,17 @@ services:
       dockerfile: backend/Dockerfile
     restart: unless-stopped
     env_file: .env
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@db:5432/postgres?sslmode=disable
     ports:
       - "8000:8000"
-    depends_on:
-      db:
-        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ── Next.js frontend ────────────────────────────────────────────────────────
+  # ── Next.js frontend (local dev only — deployed to Vercel in production) ────
   frontend:
+    profiles: ["local"]
     build:
       context: ./frontend
       dockerfile: Dockerfile
